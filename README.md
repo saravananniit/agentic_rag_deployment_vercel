@@ -28,8 +28,23 @@ uvicorn app.main:app --reload
 ## Deploy to Vercel
 
 1. Push this folder to GitHub and import it in Vercel (framework preset: Other).
-2. Add `ASTRA_DB_API_ENDPOINT` and `ASTRA_DB_APPLICATION_TOKEN` as environment variables.
-3. Deploy. `api/index.py` exposes the FastAPI app; `index.html` is served statically.
+2. In Vercel's project settings, add `ASTRA_DB_API_ENDPOINT` and
+   `ASTRA_DB_APPLICATION_TOKEN` for the same Astra database used locally.
+3. Also configure the collection names used by that database. Vercel does not read
+   your local `.env` file:
+   - Set `ASTRA_KB_COLLECTION` to the existing legacy collection if your data is
+     stored there (for example, `kb_docs`).
+   - Set `ASTRA_COLLECTIONS` to the comma-separated existing collections to show
+     in the UI (for example, `hr_docs,it_docs,fin_docs`).
+   - If you customized the registry or tickets collection, also set
+     `ASTRA_REGISTRY_COLLECTION` or `ASTRA_TICKETS_COLLECTION`.
+4. Deploy or redeploy after changing environment variables. `api/index.py`
+   exposes the FastAPI app; `index.html` is served statically.
+
+If `ASTRA_COLLECTIONS` is not set, the app uses `hr_docs,it_docs,fin_docs` and
+creates any that are missing. That can make the UI show empty new collections
+instead of existing data in a differently named collection. Check `/api/health`
+to see which collections and document counts the deployment is using.
 
 Vercel limits: request bodies are capped around 4.5 MB (the app enforces 4 MB), and `vercel.json` sets a 60 s function duration.
 

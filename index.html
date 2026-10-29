@@ -229,7 +229,7 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const API = "/api";
-let CONFIG = { departments: [], supported: [], max_upload_mb: 4 };
+let CONFIG = { collections: [], supported: [], max_upload_mb: 4 };
 let page = 1, totalPages = 1, mode = "agentic";
 let chDoc = null, chCol = null, chPage = 1, chTotal = 1;
 
@@ -439,7 +439,12 @@ function renderResult(r) {
 
 /* ---------- init ---------- */
 (async function init() {
-  try { CONFIG = await api("/config"); } catch (_) {}
+  try {
+    CONFIG = await api("/config");
+  } catch (e) {
+    $("#stats").innerHTML = `<div class="msg err" style="flex:1">${esc(`Could not load app configuration: ${e.message}`)}</div>`;
+    return;
+  }
   fillDepartments(); loadStats(); loadDocs(); loadRecords();
 })();
 </script>
