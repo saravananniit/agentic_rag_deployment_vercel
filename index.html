@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic RAG · Astra DB</title>
+<style>
+  :root {
+    --bg:#f6f5f1; --card:#ffffff; --ink:#1d2433; --muted:#667085; --line:#e4e1d8;
+    --accent:#0f6b5c; --accent-ink:#ffffff; --accent-soft:#e3f1ee; --warn:#a15c07; --warn-soft:#fdf0dc;
+    --err:#b42318; --err-soft:#fde8e6; --ok:#1a7f4b; --code:#f1efe8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14181f; --card:#1c222c; --ink:#e8eaee; --muted:#9aa3b2; --line:#2c3441;
+      --accent:#3fb59f; --accent-ink:#08201b; --accent-soft:#18332e; --warn:#e6a24a; --warn-soft:#33270f;
+      --err:#f2766b; --err-soft:#3a1d1a; --ok:#4cc38a; --code:#222a36; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  header { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:14px 24px;
+    background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+  h1 { font-size:17px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  h1 small { font-weight:400; color:var(--muted); margin-left:6px; }
+  nav { display:flex; gap:4px; margin-left:12px; }
+  nav button { border:0; background:none; font:inherit; color:var(--muted); padding:8px 14px;
+    border-radius:8px; cursor:pointer; font-weight:550; }
+  nav button.active { background:var(--accent-soft); color:var(--accent); }
+  .spacer { flex:1; }
+  main { max-width:1040px; margin:0 auto; padding:24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:18px; }
+  .card h2 { font-size:15px; margin:0 0 12px; font-weight:650; }
+  label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 4px; font-weight:550; }
+  input,select,textarea { width:100%; font:inherit; color:var(--ink); background:var(--bg);
+    border:1px solid var(--line); border-radius:8px; padding:9px 11px; }
+  input:focus,select:focus,textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  textarea { resize:vertical; min-height:84px; }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+  .row { display:flex; gap:10px; align-items:end; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:140px; }
+  .row > .fit { flex:0 0 auto; min-width:0; }
+  button.btn { font:inherit; font-weight:600; border-radius:8px; padding:9px 16px; cursor:pointer;
+    border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); }
+  button.btn.ghost { background:none; color:var(--accent); }
+  button.btn.danger { background:none; color:var(--err); border-color:var(--err); }
+  button.btn.small { padding:4px 10px; font-size:13px; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .drop { border:2px dashed var(--line); border-radius:10px; padding:26px; text-align:center; color:var(--muted);
+    cursor:pointer; transition:.15s; }
+  .drop.over,.drop:hover { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+    padding:8px 10px; border-bottom:1px solid var(--line); }
+  td { padding:10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tr:last-child td { border-bottom:0; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--accent-soft);
+    color:var(--accent); font-weight:600; }
+  .muted { color:var(--muted); }
+  .pager { display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:12px; font-size:13.5px; color:var(--muted); }
+  .pager select { width:auto; padding:4px 8px; }
+  .msg { padding:10px 14px; border-radius:8px; font-size:14px; margin-top:12px; }
+  .msg.err { background:var(--err-soft); color:var(--err); }
+  .msg.ok { background:var(--accent-soft); color:var(--ok); }
+  .msg.warn { background:var(--warn-soft); color:var(--warn); }
+  .stats { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 14px; font-size:13px; }
+  .stat b { font-size:17px; display:block; }
+  .answer { white-space:pre-wrap; font-size:15.5px; line-height:1.6; }
+  .badges { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .step { border-left:3px solid var(--accent); padding:6px 0 6px 12px; margin:0 0 10px 4px; }
+  .step .t { font-weight:650; font-size:13.5px; }
+  pre,code { background:var(--code); border-radius:6px; font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace; }
+  pre { padding:8px 10px; margin:4px 0 0; white-space:pre-wrap; word-break:break-word; max-height:160px; overflow:auto; }
+  details > summary { cursor:pointer; font-weight:600; font-size:14px; margin-bottom:8px; }
+  .src { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-bottom:8px; font-size:13.5px; }
+  .src .h { font-weight:600; margin-bottom:2px; }
+  dialog { border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink);
+    max-width:720px; width:92vw; padding:20px; }
+  dialog::backdrop { background:rgba(0,0,0,.4); }
+  .chunk { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin-bottom:8px; font-size:13.5px; white-space:pre-wrap; }
+  .hidden { display:none; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button { border:0; background:var(--bg); color:var(--muted); font:inherit; padding:8px 14px; cursor:pointer; font-weight:550; }
+  .seg button.on { background:var(--accent); color:var(--accent-ink); }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent);
+    border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  @media (max-width:640px) { main { padding:14px; } header { padding:12px 14px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agentic RAG <small>Astra DB · collection-wise hybrid RAG</small></h1>
+  <nav>
+    <button id="nav-storage" class="active" data-tab="storage">Storage</button>
+    <button id="nav-search" data-tab="search">Search</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="btn ghost small" id="btn-settings">Model settings</button>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <!-- ============ STORAGE ============ -->
+  <section id="tab-storage">
+    <div class="card">
+      <h2>Upload a document</h2>
+      <div class="row">
+        <div class="fit" style="min-width:180px">
+          <label for="up-dept">Collection</label>
+          <select id="up-dept"></select>
+        </div>
+        <div class="muted fit" id="up-hint" style="padding-bottom:10px"></div>
+      </div>
+      <div class="drop" id="drop" style="margin-top:12px" tabindex="0" role="button">
+        Drop a file here or click to choose<br><span id="drop-sel" class="muted"></span>
+      </div>
+      <input type="file" id="file" class="hidden">
+      <div class="row" style="margin-top:12px">
+        <div class="fit"><button class="btn" id="btn-upload" disabled>Upload and index</button></div>
+      </div>
+      <div id="up-msg"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <h2 style="margin:0;flex:1">Stored documents</h2>
+        <div class="fit" style="min-width:170px">
+          <select id="f-dept" aria-label="Filter by collection"></select>
+        </div>
+        <div class="fit"><button class="btn ghost small" id="btn-refresh">Refresh</button></div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>File</th><th>Collection</th><th>Chunks</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+          <tbody id="docs"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="pg-info"></span>
+        <select id="pg-size" aria-label="Rows per page"><option>5</option><option selected>10</option><option>25</option></select>
+        <button class="btn ghost small" id="pg-prev">Prev</button>
+        <button class="btn ghost small" id="pg-next">Next</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:6px">
+        <h2 style="margin:0;flex:1">Browse collection records</h2>
+        <div class="fit" style="min-width:170px"><select id="r-coll" aria-label="Collection to browse"></select></div>
+        <div class="fit"><button class="btn ghost small" id="btn-rrefresh">Refresh</button></div>
+      </div>
+      <p class="muted" style="margin:0 0 10px">Every record in the collection, including ones that were not uploaded through this app.</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th style="width:22%">Source</th><th>Content / preview</th><th style="width:30%">Metadata / fields</th></tr></thead>
+          <tbody id="recs"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="r-info"></span>
+        <select id="r-size" aria-label="Rows per page"><option>5</option><option selected>10</option><option>25</option></select>
+        <button class="btn ghost small" id="r-prev">Prev</button>
+        <button class="btn ghost small" id="r-next">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SEARCH ============ -->
+  <section id="tab-search" class="hidden">
+    <form class="card" id="search-form">
+      <h2>Ask a question</h2>
+      <label for="q">Question</label>
+      <textarea id="q" placeholder="e.g. How many days of annual leave do new joiners get, and how many remain if I take 5?"></textarea>
+      <div class="row" style="margin-top:12px">
+        <div class="fit">
+          <label>Mode</label>
+          <div class="seg" id="mode">
+            <button type="button" data-m="agentic" class="on">Agentic</button>
+            <button type="button" data-m="plain">Plain RAG</button>
+          </div>
+        </div>
+        <div class="fit" style="min-width:170px">
+          <label for="s-dept">Collection</label>
+          <select id="s-dept"></select>
+        </div>
+        <div class="fit" style="min-width:110px">
+          <label for="steps">Max steps</label>
+          <select id="steps"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+        </div>
+        <div class="fit"><button class="btn" id="btn-ask" type="submit">Ask</button></div>
+      </div>
+      <div id="s-msg"></div>
+    </form>
+    <div id="result"></div>
+  </section>
+</main>
+
+<!-- ============ SETTINGS ============ -->
+<dialog id="dlg-settings">
+  <h2 style="margin-top:0">Azure OpenAI settings</h2>
+  <p class="muted" style="margin-top:0">Entered at run time and kept only in this browser tab (session storage).
+    They are sent with each search request and never stored on the server. Embeddings use Astra's built-in NVIDIA model, so no embedding key is needed.</p>
+  <div class="grid">
+    <div><label for="az-endpoint">Endpoint</label><input id="az-endpoint" placeholder="https://my-resource.openai.azure.com" autocomplete="off"></div>
+    <div><label for="az-deploy">Deployment name (model)</label><input id="az-deploy" placeholder="gpt-4o" autocomplete="off"></div>
+    <div><label for="az-version">API version</label><input id="az-version" value="2025-04-01-preview" autocomplete="off"></div>
+    <div><label for="az-key">API key</label><input id="az-key" type="password" autocomplete="off"></div>
+    <div style="grid-column:1/-1"><label for="tv-key">Tavily API key (optional, enables the web_search tool)</label><input id="tv-key" type="password" autocomplete="off"></div>
+  </div>
+  <div class="row" style="margin-top:16px;justify-content:flex-end">
+    <div class="fit"><button class="btn ghost" id="btn-clear">Clear</button></div>
+    <div class="fit"><button class="btn" id="btn-save">Save for this tab</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlg-chunks">
+  <div class="row" style="margin-bottom:10px">
+    <h2 id="ch-title" style="margin:0;flex:1">Chunks</h2>
+    <div class="fit"><button class="btn ghost small" id="ch-close">Close</button></div>
+  </div>
+  <div id="ch-body"></div>
+  <div class="pager"><span id="ch-info"></span>
+    <button class="btn ghost small" id="ch-prev">Prev</button><button class="btn ghost small" id="ch-next">Next</button></div>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const API = "/api";
+let CONFIG = { departments: [], supported: [], max_upload_mb: 4 };
+let page = 1, totalPages = 1, mode = "agentic";
+let chDoc = null, chCol = null, chPage = 1, chTotal = 1;
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, opts);
+  let body = null;
+  try { body = await res.json(); } catch (_) {}
+  if (!res.ok) throw new Error((body && (body.detail?.message || body.detail)) || res.statusText);
+  return body;
+}
+const fmtSize = (b) => b > 1048576 ? (b/1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b/1024)) + " KB";
+const fmtDate = (s) => s ? new Date(s).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
+const msg = (el, kind, text) => { el.innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; };
+
+/* ---------- settings (session only) ---------- */
+const SKEY = "agentic-rag-azure";
+const getSettings = () => { try { return JSON.parse(sessionStorage.getItem(SKEY) || "{}"); } catch (_) { return {}; } };
+function openSettings() {
+  const s = getSettings();
+  $("#az-endpoint").value = s.endpoint || ""; $("#az-deploy").value = s.deployment || "";
+  $("#az-version").value = s.version || "2025-04-01-preview"; $("#az-key").value = s.key || ""; $("#tv-key").value = s.tavily || "";
+  $("#dlg-settings").showModal();
+}
+$("#btn-settings").onclick = openSettings;
+$("#btn-save").onclick = () => {
+  try {
+    sessionStorage.setItem(SKEY, JSON.stringify({
+      endpoint: $("#az-endpoint").value.trim(), deployment: $("#az-deploy").value.trim(),
+      version: $("#az-version").value.trim(), key: $("#az-key").value.trim(), tavily: $("#tv-key").value.trim() }));
+  } catch (_) {}
+  $("#dlg-settings").close();
+};
+$("#btn-clear").onclick = () => { try { sessionStorage.removeItem(SKEY); } catch (_) {} openSettings(); };
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
+  $("#tab-storage").classList.toggle("hidden", b.dataset.tab !== "storage");
+  $("#tab-search").classList.toggle("hidden", b.dataset.tab !== "search");
+});
+
+/* ---------- stats ---------- */
+async function loadStats() {
+  try {
+    const s = await api("/health");
+    $("#stats").innerHTML = s.collections.map(c => {
+      const feats = !c.exists ? "missing" : [c.embedding || "no embedding service", c.lexical ? "hybrid" : "", c.rerank ? "rerank" : ""].filter(Boolean).join(" · ");
+      return `<div class="stat" style="min-width:210px"><b>${c.documents} <span style="font-weight:500;font-size:13px">files</span></b>${esc(c.name)} · ${c.chunks ?? "?"} records<br><span class="muted">${esc(feats)}</span></div>`;
+    }).join("");
+  } catch (e) {
+    $("#stats").innerHTML = `<div class="msg err" style="flex:1">${esc(e.message)}</div>`;
+  }
+}
+
+/* ---------- storage ---------- */
+function fillDepartments() {
+  const opts = CONFIG.collections.map(d => `<option value="${d}">${d}</option>`).join("");
+  $("#up-dept").innerHTML = opts;
+  $("#f-dept").innerHTML = `<option value="">All collections</option>` + opts;
+  $("#r-coll").innerHTML = opts;
+  $("#s-dept").innerHTML = `<option value="">All collections (agent decides)</option>` + opts;
+  $("#up-hint").textContent = `Max ${CONFIG.max_upload_mb} MB · ${CONFIG.supported.join(" ")}`;
+}
+let chosen = null;
+const pick = (f) => { chosen = f; $("#drop-sel").textContent = f ? f.name : ""; $("#btn-upload").disabled = !f; };
+$("#drop").onclick = () => $("#file").click();
+$("#drop").onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") $("#file").click(); };
+$("#file").onchange = (e) => pick(e.target.files[0] || null);
+["dragover","dragenter"].forEach(ev => $("#drop").addEventListener(ev, e => { e.preventDefault(); $("#drop").classList.add("over"); }));
+["dragleave","drop"].forEach(ev => $("#drop").addEventListener(ev, e => { e.preventDefault(); $("#drop").classList.remove("over"); }));
+$("#drop").addEventListener("drop", e => pick(e.dataTransfer.files[0] || null));
+
+$("#btn-upload").onclick = async () => {
+  if (!chosen) return;
+  if (chosen.size > CONFIG.max_upload_mb * 1048576) { msg($("#up-msg"), "err", `File is larger than ${CONFIG.max_upload_mb} MB.`); return; }
+  const fd = new FormData(); fd.append("file", chosen); fd.append("collection", $("#up-dept").value);
+  $("#btn-upload").disabled = true;
+  $("#up-msg").innerHTML = `<div class="msg warn"><span class="spin"></span>Parsing, chunking and embedding…</div>`;
+  try {
+    const r = await api("/upload", { method: "POST", body: fd });
+    msg($("#up-msg"), "ok", `Stored ${r.document.filename}: ${r.document.chunk_count} chunks in ${r.document.collection}.`);
+    pick(null); $("#file").value = ""; page = 1; await loadDocs(); loadStats(); loadRecords();
+  } catch (e) { msg($("#up-msg"), "err", e.message); $("#btn-upload").disabled = false; }
+};
+
+async function loadDocs() {
+  const size = $("#pg-size").value, dept = $("#f-dept").value;
+  try {
+    const r = await api(`/documents?page=${page}&page_size=${size}` + (dept ? `&collection=${encodeURIComponent(dept)}` : ""));
+    totalPages = r.total_pages;
+    $("#docs").innerHTML = r.items.length ? r.items.map(d => `
+      <tr><td>${esc(d.filename)}</td><td><span class="tag">${esc(d.collection || "legacy")}</span></td>
+      <td>${d.chunk_count}</td><td>${fmtSize(d.size_bytes)}</td><td class="muted">${esc(fmtDate(d.uploaded_at))}</td>
+      <td style="white-space:nowrap"><button class="btn ghost small" data-view="${esc(d.doc_id)}" data-col="${esc(d.collection || "")}" data-name="${esc(d.filename)}" ${d.collection ? "" : 'disabled title="Saved by an older version; no collection recorded"'}>Chunks</button>
+      <button class="btn danger small" data-del="${esc(d.doc_id)}" data-name="${esc(d.filename)}">Delete</button></td></tr>`).join("")
+      : `<tr><td colspan="6" class="muted">No documents yet. Upload one above.</td></tr>`;
+    $("#pg-info").textContent = `Page ${r.page} of ${r.total_pages} · ${r.total} documents`;
+    $("#pg-prev").disabled = page <= 1; $("#pg-next").disabled = page >= totalPages;
+  } catch (e) { $("#docs").innerHTML = `<tr><td colspan="6"><div class="msg err">${esc(e.message)}</div></td></tr>`; }
+}
+$("#docs").onclick = async (e) => {
+  const v = e.target.closest("[data-view]"), d = e.target.closest("[data-del]");
+  if (v) { chDoc = v.dataset.view; chCol = v.dataset.col; chPage = 1; $("#ch-title").textContent = v.dataset.name; $("#dlg-chunks").showModal(); loadChunks(); }
+  if (d && confirm(`Delete "${d.dataset.name}" and all its chunks?`)) {
+    try { await api(`/documents/${d.dataset.del}`, { method: "DELETE" }); await loadDocs(); loadStats(); loadRecords(); }
+    catch (err) { msg($("#up-msg"), "err", err.message); }
+  }
+};
+$("#pg-prev").onclick = () => { page = Math.max(1, page - 1); loadDocs(); };
+$("#pg-next").onclick = () => { page = Math.min(totalPages, page + 1); loadDocs(); };
+$("#pg-size").onchange = $("#f-dept").onchange = () => { page = 1; loadDocs(); };
+$("#btn-refresh").onclick = () => { loadDocs(); loadStats(); };
+
+async function loadChunks() {
+  try {
+    const r = await api(`/documents/${chDoc}/chunks?collection=${encodeURIComponent(chCol)}&page=${chPage}&page_size=5`);
+    chTotal = r.total_pages;
+    $("#ch-body").innerHTML = r.items.map(c => `<div class="chunk"><b>#${c.chunk_index}</b>\n${esc(c.text)}</div>`).join("");
+    $("#ch-info").textContent = `Page ${r.page} of ${r.total_pages} · ${r.total} chunks`;
+    $("#ch-prev").disabled = chPage <= 1; $("#ch-next").disabled = chPage >= chTotal;
+  } catch (e) { $("#ch-body").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+$("#ch-prev").onclick = () => { chPage--; loadChunks(); };
+$("#ch-next").onclick = () => { chPage++; loadChunks(); };
+$("#ch-close").onclick = () => $("#dlg-chunks").close();
+
+/* ---------- record browser ---------- */
+let rPage = 1, rTotal = 1;
+async function loadRecords() {
+  const coll = $("#r-coll").value; if (!coll) return;
+  try {
+    const r = await api(`/collections/${encodeURIComponent(coll)}/records?page=${rPage}&page_size=${$("#r-size").value}`);
+    rTotal = r.total_pages;
+    $("#recs").innerHTML = r.items.length ? r.items.map(x => {
+      const fields = Object.entries(x.fields || {});
+      const fieldRows = (items) => items.map(([k, v]) =>
+        `<div class="record-field"><b>${esc(k)}</b>: ${esc(v)}</div>`).join("");
+      return `<tr>
+      <td>${esc(x.source)}<div class="muted" style="font-size:12px;word-break:break-all">${esc(x._id)}</div></td>
+      <td style="white-space:pre-wrap">${esc(x.text) || '<span class="muted">Metadata-only record; document text is not stored here.</span>'}</td>
+      <td class="muted" style="font-size:12.5px">${fields.length ? fieldRows(fields.slice(0, 4)) : '<span>No metadata fields.</span>'}
+        ${fields.length > 4 ? `<details><summary>Show all ${fields.length} fields</summary>${fieldRows(fields.slice(4))}</details>` : ""}</td></tr>`;
+    }).join("")
+      : `<tr><td colspan="3" class="muted">This collection has no records.</td></tr>`;
+    $("#r-info").textContent = `Page ${r.page} of ${r.total_pages} · ${r.total} records`;
+    $("#r-prev").disabled = rPage <= 1; $("#r-next").disabled = rPage >= rTotal;
+  } catch (e) { $("#recs").innerHTML = `<tr><td colspan="3"><div class="msg err">${esc(e.message)}</div></td></tr>`; }
+}
+$("#r-coll").onchange = $("#r-size").onchange = () => { rPage = 1; loadRecords(); };
+$("#r-prev").onclick = () => { rPage = Math.max(1, rPage - 1); loadRecords(); };
+$("#r-next").onclick = () => { rPage = Math.min(rTotal, rPage + 1); loadRecords(); };
+$("#btn-rrefresh").onclick = () => { loadRecords(); loadStats(); };
+
+/* ---------- search ---------- */
+document.querySelectorAll("#mode button").forEach(b => b.onclick = () => {
+  mode = b.dataset.m; document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b));
+  $("#steps").disabled = mode === "plain";
+});
+$("#search-form").onsubmit = async (event) => {
+  event.preventDefault();
+  const q = $("#q").value.trim();
+  if (q.length < 2 || q.length > 2000) {
+    msg($("#s-msg"), "err", "Enter a question between 2 and 2000 characters.");
+    return;
+  }
+  const s = getSettings();
+  if (!s.endpoint || !s.deployment || !s.key) { msg($("#s-msg"), "err", "Enter your Azure endpoint, deployment name and API key in Model settings first."); openSettings(); return; }
+  msg($("#s-msg"), "", ""); $("#btn-ask").disabled = true;
+  $("#result").innerHTML = `<div class="card"><span class="spin"></span>${mode === "agentic" ? "The agent is working…" : "Retrieving and answering…"}</div>`;
+  try {
+    const headers = { "Content-Type": "application/json", "X-Azure-Endpoint": s.endpoint, "X-Azure-Deployment": s.deployment,
+      "X-Azure-Key": s.key, "X-Azure-Api-Version": s.version || "2025-04-01-preview" };
+    if (s.tavily) headers["X-Tavily-Key"] = s.tavily;
+    const r = await api("/search", { method: "POST", headers, body: JSON.stringify({
+      question: q, mode, collection: $("#s-dept").value || null, max_steps: Number($("#steps").value) }) });
+    renderResult(r);
+  } catch (e) { $("#result").innerHTML = ""; msg($("#s-msg"), "err", e.message || "Search failed."); }
+  $("#btn-ask").disabled = false;
+};
+function renderResult(r) {
+  if (!r || typeof r.answer !== "string" || !r.answer.trim()
+      || !Array.isArray(r.trace) || !Array.isArray(r.sources)
+      || r.trace.some(t => !t || typeof t !== "object")
+      || r.sources.some(s => !s || typeof s !== "object")
+      || !Number.isInteger(r.steps) || typeof r.mode !== "string") {
+    throw new Error("Search returned an incomplete response. Please try again.");
+  }
+  const tools = [...new Set(r.trace.map(t => t.tool).filter(t => typeof t === "string"))];
+  const badges = `<div class="badges"><span class="tag">${esc(r.mode)}</span><span class="tag">${r.steps} step${r.steps === 1 ? "" : "s"}</span>`
+    + tools.map(t => `<span class="tag">${esc(t)}</span>`).join("")
+    + (r.stopped === "step_limit" ? `<span class="tag" style="background:var(--warn-soft);color:var(--warn)">stopped at step limit</span>` : "") + `</div>`;
+  const trace = r.trace.length ? r.trace.map(t => `<div class="step"><div class="t">Step ${esc(t.step)} · ${esc(t.tool || "unknown tool")}</div>
+    <div class="muted">args</div><pre>${esc(JSON.stringify(t.args ?? {}))}</pre><div class="muted" style="margin-top:4px">result</div><pre>${esc(t.result ?? "")}</pre></div>`).join("")
+    : `<div class="muted">The agent answered directly without calling a tool.</div>`;
+  const srcs = r.sources.length ? r.sources.map(s => {
+    const text = typeof s.text === "string" ? s.text : "";
+    const scores = s.scores && typeof s.scores === "object" && !Array.isArray(s.scores) ? s.scores : {};
+    return `<div class="src"><div class="h">${esc(s.filename || "Unknown document")} <span class="muted">#chunk${esc(s.chunk_index ?? "?")}</span> <span class="tag">${esc(s.collection || "unknown collection")}</span></div>
+    <div class="muted">${esc(text.slice(0, 280))}${text.length > 280 ? "…" : ""}</div>
+    <div class="muted" style="margin-top:2px">${esc(Object.entries(scores).map(([k, v]) => k + " " + v).join(" · "))}</div></div>`;
+  }).join("")
+    : `<div class="muted">No knowledge-base sources were used.</div>`;
+  $("#result").innerHTML = `<div class="card"><h2>Answer</h2>${badges}<div class="answer">${esc(r.answer)}</div></div>
+    <div class="card"><details open><summary>Agent trace (${r.trace.length} tool call${r.trace.length === 1 ? "" : "s"})</summary>${trace}</details></div>
+    <div class="card"><details><summary>Sources (${r.sources.length})</summary>${srcs}</details></div>`;
+}
+
+/* ---------- init ---------- */
+(async function init() {
+  try { CONFIG = await api("/config"); } catch (_) {}
+  fillDepartments(); loadStats(); loadDocs(); loadRecords();
+})();
+</script>
+</body>
+</html>
